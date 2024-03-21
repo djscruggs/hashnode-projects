@@ -4,62 +4,68 @@ import './App.css'
 import DataTable from 'react-data-table-component';
 
 
+// shape of a row in the table
 interface Product {
+  id: number
   title: string;
   description: string;
   price: number;
   thumbnail: string;
 }
-interface DatasetState {
-  mode: 'idle' | 'loading' | 'error'
-  error?: string
-  data: Product[]
-  search?: string
-  queryParams: {skip: number, limit: number}
-  totalRows: number
-}
+// shape of the data returned from the API
 interface FilteredSet {
   total:number
   skip: number
   limit: number
   products: Product[]
 }
+// shape of the params and data to be rendered and mutated in response to user events
+interface DataParams {
+  url: string
+  status: 'idle' | 'loading' | 'error'
+  error?: string
+  searchTerm?: string
+  queryParams: {skip: number, limit: number} // pagination params
+  data: FilteredSet['products'] // data to be rendered
+  totalRows: FilteredSet['total'] // total rows in unfiltered set for use in pagination
+}
 
-type DatasetAction = 
+
+type Action = 
   { type: 'clear-search'}
 | { type: 'reset'}
-| { type: 'set-mode'; payload: DatasetState['mode'] }
-| { type: 'set-search'; payload: string }
-| { type: 'set-page'; payload: number }
-| { type: 'set-rows-per-page'; payload: number }
-| { type: 'set-error'; payload: string }
-| { type: 'set-data'; payload: { data: FilteredSet} }
+| { type: 'set-status', payload: DataParams['status'] }
+| { type: 'set-search', payload: string }
+| { type: 'set-page', payload: number }
+| { type: 'set-rows-per-page', payload: number }
+| { type: 'set-error', payload: string }
+| { type: 'set-data', payload: FilteredSet }
 
-const DEFAULT_DATA_LIMIT = 20
+
 
 function App() {
-  const initialState: DatasetState = {
-    mode: 'idle',
+  const initialState: DataParams = {
+    url: 'https://dummyjson.com/products',
+    status: 'idle',
     data: [],
-    queryParams: {skip:0, limit:DEFAULT_DATA_LIMIT},
+    queryParams: {skip:0, limit:20},
     totalRows: 0,
-  };
-  const reducer = (state: DatasetState, action: DatasetAction): DatasetState | void => {
+  }
+  const reducer = (state: DataParams, action: Action): DataParams | void => {
     switch (action.type) {
       case 'reset': {
-        const newQueryParams = {skip: 0, limit: state.queryParams?.limit || DEFAULT_DATA_LIMIT};
+        const newQueryParams = {skip: 0, limit: state.queryParams?.limit || 20};
         return {...initialState, queryParams: newQueryParams};
       }
-      case 'set-mode': {
-        if(state.mode == action.payload){
+      case 'set-status': {
+        if(state.status == action.payload){
           return state
         }
-        return { ...state, mode: action.payload };
+        return { ...state, status: action.payload };
       }
       case 'set-data': {
-        const { data } = action.payload;
-        const totalRows = data.total
-        return { ...state, data: data.products, totalRows, mode: 'idle' };
+        const totalRows = action.payload.total
+        return { ...state, data: action.payload.products, totalRows, status: 'idle' };
       }
       case 'set-rows-per-page': {
         if(state.queryParams.limit === action.payload){
@@ -69,7 +75,7 @@ function App() {
         return {...state, queryParams: newQueryParams};
       }
       case 'set-page': {
-        const newSkip = (action.payload-1) * state.queryParams.limit
+        const newSkip = action.payload<=1 ? 0 : (action.payload-1) * state.queryParams.limit
         if(newSkip == state.queryParams.skip){
           return state
         }
@@ -80,96 +86,114 @@ function App() {
         return {...state, error: action.payload};
       }
       case 'clear-search': {
-        const newQueryParams = {skip: 0, limit: state.queryParams?.limit || DEFAULT_DATA_LIMIT};
-        if(JSON.stringify(state.queryParams) == JSON.stringify(newQueryParams)){
-          return state
-        }
-        return {...state, queryParams: newQueryParams};
+        const newQueryParams = {skip: 0, limit: state.queryParams?.limit || 20};
+        const url = 'https://dummyjson.com/products'
+        return {...state, url, queryParams: newQueryParams};
       }
       case 'set-search': {
-        if(state.search === action.payload) {
+        if(state.searchTerm === action.payload) {
           return state
         }
-        const newQueryParams = {name: action.payload, skip: 0, limit: state.queryParams?.skip || 0 }
-        return {...state, queryParams: newQueryParams};
+        const url = 'https://dummyjson.com/products/search'
+        const newQueryParams = {q: action.payload, skip: 0, limit: state.queryParams?.limit || 20 }
+        const result =  {...state, url, queryParams: newQueryParams}
+        return result
+      }
+      default: {
+        throw new Error(`Invalid action called: ${(action as Action).type}`)
       }
     }
   };
-  const [state, dispatch] = useReducer(reducer, initialState);
-  const [products, setProducts] = useState<Product[]>([])
+  const [state, dispatch] = useReducer(reducer, initialState)
   const [searchTerm, setSearchTerm] = useState('')
   const columns =[
     {
       name: 'Title',
-      selector: (row: any) => row.title,
+      selector: (row: Product) => row.title,
     },
     {
       name: 'Description',
-      selector: (row: any) => row.description,
+      selector: (row: Product) => row.description,
     },
     {
       name: 'Price',
-      selector: (row: any) => row.price/10,
+      selector: (row: Product) => `$${(row.price/10).toFixed(2)}`,
     },
     {
       name: 'Picture',
-      selector: (row: any) => <img src={row.thumbnail} style={{height:'40px'}} alt={row.title} />,
+      cell: (row: Product) => <img src={row.thumbnail} style={{height:'40px'}} alt={row.title} />,
     },
   ]
-  const fetchProducts = async () => {
-    const res = await axios.get('https://dummyjson.com/products/?limit=20')
-    console.log(res.data.products)
-    setProducts(res.data.products)
-  }
+  
   useEffect(() => {
-    fetchProducts()
-    
-  }, [])
+    const fetchProducts = async () => {
+      dispatch({ type: 'set-status', payload: 'loading'})
+      const res = await axios.get(state.url, {params: state.queryParams})
+      dispatch({ type: 'set-data', payload: res.data})
+      dispatch({ type: 'set-status', payload: 'idle'})
+    }
+    fetchProducts()    
+  }, [state.queryParams, state.url])
   const handlePerRowsChange = (newPerPage: number) => {
     dispatch({ type: 'set-rows-per-page', payload: newPerPage });
   }
   function handlePageChange(page: number){
-    dispatch({ type: 'set-page', payload: page });
+    
+    dispatch({ type: 'set-page', payload: page })
   }
-  const handleSearch = (term = '') => {
-    if (term) {
-      dispatch({ type: 'set-search', payload: term });
-    } else {
+  const handleSearchTerm = (term: string) => {
+    setSearchTerm(term)
+    //if term is blank, clear search
+    if(!term){  
       dispatch({ type: 'clear-search'})
-      setSearchTerm('')
     }
   }
-  const clearSearch = (e: React.MouseEvent<HTMLAnchorElement>) => {
+  const triggerSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    return handleSearch('')
+    dispatch({ type: 'set-search', payload: searchTerm });
   }
+  const clearSearch = () => {
+    setSearchTerm('')
+    dispatch({ type: 'clear-search'})
+  }
+  
   return (
     <>
-        <div style={{border: '1px solid red', backgroundColor: 'white', color:'black', height: '100%', width: '100%'}}>
-        <input 
-          type="text" 
-          style={{backgroundColor: 'white', color:'black', marginTop: "20px", padding:'10px', width:"20%"}}
-          placeholder="Search products" 
-          value={searchTerm} 
-          onChange={(e) => setSearchTerm(e.target.value)} 
-        />
-        <button onClick={handleSearch}>Search</button>
-        {searchTerm && 
-        <div>
-          <p>Search results for "{searchTerm}" </p>
-          <p><a href="#" onClick={clearSearch}>clear search</a></p>
-        </div>
-        }
-        <DataTable
-          title="Products"
-          columns={columns}
-          data={products}
-          pagination
-          paginationPerPage={state.queryParams.limit}
-          onChangeRowsPerPage={handlePerRowsChange}
-          onChangePage={handlePageChange}
-          paginationTotalRows={state.totalRows}
-        />
+        <div style={{color:'black', height: '100%', minWidth: '90vw'}}>
+          <form onSubmit={triggerSearch}>
+          <input 
+            type="text" 
+            style={{color:'black', marginTop: "20px", marginRight: "20px", padding:'10px', width:"20vh"}}
+            placeholder="Search products" 
+            onChange = {(e) => handleSearchTerm(e.target.value)}
+            value={searchTerm} 
+          />
+          <button type="submit">Search</button>
+          </form>
+          {state.queryParams.q && 
+          <div>
+            <p>Search results for "{state.queryParams.q}" 
+            <span style={{fontSize: '12px', marginLeft: '10px',  cursor: 'pointer', textDecoration: 'underline', color:'blue'}} onClick={clearSearch}>clear search</span>
+            </p>
+            
+          </div>
+          }
+          {state.status == 'loading' && <p>Loading...</p>}
+          {state.status == 'error' && <p>Error: {state.error}</p>}
+          
+            <DataTable
+              title="Products"
+              style={{width: '100%', minWidth: '100vw'}}
+              columns={columns}
+              data={state.data}
+              pagination
+              paginationServer
+              onChangePage={handlePageChange}
+              paginationPerPage={state.queryParams.limit}
+              onChangeRowsPerPage={handlePerRowsChange}
+              paginationTotalRows={state.totalRows}
+            />
+          
         </div>
     </>
   )
