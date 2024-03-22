@@ -86,8 +86,9 @@ function App() {
   }
   return (
     <div className='flex justify-center items-center min-h-screen w-screen'>
-      <div className='flex flex-col border justify-center border-gray-200 rounded-md p-8 my-8 max-w-[50%]'>
-        <h1>Persistent Auth State Example</h1>
+      <div className='flex flex-col border justify-center border-gray-200 rounded-md p-8 my-8 max-w-[80%]'>
+        <h1>Persistent Auth State with localStorage Example</h1>
+        <p>This is a companion repository to my <a href='https://djscruggs.hashnode.dev/auth-state-in-react-with-localstorage' target='_blank' rel='noreferrer'>tutorial on persisting auth state</a>.</p>
         <button className='my-8' onClick={manualRefresh}>Manually refresh Token</button>
         {user && refreshed && <p className='text-green-500 my-4'>Token refreshed. Check JavaScript console to see it</p>}
         {user && 
