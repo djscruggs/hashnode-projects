@@ -51,16 +51,13 @@ function App() {
     queryParams: {skip:0, limit:20},
     totalRows: 0,
   }
-  const reducer = (state: DataParams, action: Action): DataParams | void => {
+  const reducer = (state: DataParams, action: Action): DataParams => {
     switch (action.type) {
       case 'reset': {
         const newQueryParams = {skip: 0, limit: state.queryParams?.limit || 20};
         return {...initialState, queryParams: newQueryParams};
       }
       case 'set-status': {
-        if(state.status == action.payload){
-          return state
-        }
         return { ...state, status: action.payload };
       }
       case 'set-data': {
@@ -68,17 +65,11 @@ function App() {
         return { ...state, data: action.payload.products, totalRows, status: 'idle' };
       }
       case 'set-rows-per-page': {
-        if(state.queryParams.limit === action.payload){
-          return state
-        }
         const newQueryParams = {...state.queryParams, limit: action.payload}
         return {...state, queryParams: newQueryParams};
       }
       case 'set-page': {
         const newSkip = action.payload<=1 ? 0 : (action.payload-1) * state.queryParams.limit
-        if(newSkip == state.queryParams.skip){
-          return state
-        }
         const newQueryParams = {...state.queryParams, skip: newSkip}
         return {...state, queryParams: newQueryParams};
       }
@@ -91,9 +82,6 @@ function App() {
         return {...state, url, queryParams: newQueryParams};
       }
       case 'set-search': {
-        if(state.searchTerm === action.payload) {
-          return state
-        }
         const url = 'https://dummyjson.com/products/search'
         const newQueryParams = {q: action.payload, skip: 0, limit: state.queryParams?.limit || 20 }
         const result =  {...state, url, queryParams: newQueryParams}
@@ -133,7 +121,8 @@ function App() {
       dispatch({ type: 'set-status', payload: 'idle'})
     }
     fetchProducts()    
-  }, [state.queryParams, state.url])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.queryParams])
   const handlePerRowsChange = (newPerPage: number) => {
     dispatch({ type: 'set-rows-per-page', payload: newPerPage });
   }

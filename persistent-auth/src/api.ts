@@ -47,12 +47,12 @@ export function logout() {
   localStorage.removeItem('user');
 }
 
-//dummyjson does not have a re-auth function per se, so this just fetches the user using the token
-export async function refreshAuth() {
-  const url = apiUrl(`auth/me`)
-  const response = await axios.get(url, authHeaders());
+export async function refreshAuth(expiresInMins: number = 60) {
+  const url = apiUrl(`auth/refresh`)
+  const response = await axios.post(url, {expiresInMins: expiresInMins}, authHeaders());
   return response.data
 }
+
 export function setLoginUser(user: LoginUser): void {
   const jsonUser = JSON.stringify(user);
   localStorage.setItem('user', jsonUser);

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
-import { login, logout, LoginUser, refreshAuth, reLogin } from './api'
-import exp from 'constants'
+import { login, logout, LoginUser, refreshAuth } from './api'
 
 function App() {
   const [username, setUsername] = useState('')
@@ -11,12 +10,16 @@ function App() {
   const [refreshed, setRefreshed] = useState(false)
   
   const manualRefresh = async () => {
+    console.log('manual refresh')
     if(!user) {
+      console.log('manual refresh no user')
       setError('No user to refresh')
       return
     }
     try {
-      const data = await refreshAuth()
+      console.log('calling API')
+      // pass in a different number to set a different expiration
+      const data = await refreshAuth(11)
       console.log('result from refresh', data)
       setTimer(600)
       setRefreshed(true)
@@ -24,7 +27,7 @@ function App() {
       console.error('error', error)
       setUser(null)
     }
-    
+    console.log('manual refresh done')
   }
   useEffect(() => {
     let countdown: NodeJS.Timeout | null = null;
@@ -86,7 +89,7 @@ function App() {
   }
   return (
     <div className='flex justify-center items-center min-h-screen w-screen'>
-      <div className='flex flex-col border justify-center border-gray-200 rounded-md p-8 my-8 max-w-[80%]'>
+      <div className='flex flex-col border justify-center border-gray-200 rounded-md p-8 my-8 max-w-[8api0%]'>
         <h1>Persistent Auth State with localStorage Example</h1>
         <p>This is a companion repository to my <a href='https://djscruggs.hashnode.dev/auth-state-in-react-with-localstorage' target='_blank' rel='noreferrer'>tutorial on persisting auth state</a>.</p>
         <button className='my-8' onClick={manualRefresh}>Manually refresh Token</button>
@@ -107,9 +110,12 @@ function App() {
                          typeof user[key as keyof LoginUser] !== 'object' && 
                          <>{user[key as keyof LoginUser]}</>
                       ) : (
-                        <textarea className='w-full h-80'>
-                          {user[key]}
-                        </textarea>
+                        <textarea 
+                        readOnly
+                        className='w-full h-80'
+                        value={user[key]}
+                        />
+
                       )}
                     </div>
                   </div>
